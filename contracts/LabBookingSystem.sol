@@ -155,6 +155,7 @@ contract LabBookingSystem is Ownable, ReentrancyGuard {
         bookings[bookingId] = Booking({
             roomId: roomId,
             roomName: roomName,
+            areaId: areaId,
             areaName: areaName,
             position: position,
             slot: slot,
