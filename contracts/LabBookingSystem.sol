@@ -25,6 +25,10 @@ contract LabBookingSystem is Ownable, ReentrancyGuard {
 
     struct Booking {
         string roomId;
+        string roomName;
+        string areaId;
+        string areaName;
+        string position;
         uint8 slot;
         address user;
         uint256 price;
@@ -41,11 +45,25 @@ contract LabBookingSystem is Ownable, ReentrancyGuard {
     event BookingCreated(
         bytes32 indexed bookingId,
         string roomId,
+        string roomName,
+        string areaId,
+        string areaName,
+        string position,
         uint8 slot,
-        address user,
+        address indexed user,
         uint256 time
     );
-    event BookingCancelled(bytes32 indexed bookingId, uint256 refundAmount);
+
+    event BookingCancelled(
+        bytes32 indexed bookingId,
+        string roomId,
+        string roomName,
+        string areaId,
+        string areaName,
+        string position,
+        uint256 refundAmount
+    );
+
     event BookingCheckedIn(bytes32 indexed bookingId);
     event UserBlocked(address indexed user);
     event UserUnblocked(address indexed user);
@@ -109,6 +127,10 @@ contract LabBookingSystem is Ownable, ReentrancyGuard {
 
     function book(
         string memory roomId,
+        string memory roomName,
+        string memory areaId,
+        string memory areaName,
+        string memory position,
         uint8 slot,
         uint256 time
     ) external onlyRegistered notBlocked nonReentrant {
@@ -130,18 +152,32 @@ contract LabBookingSystem is Ownable, ReentrancyGuard {
             "Token transfer failed"
         );
 
-        bookings[bookingId] = Booking(
-            roomId,
-            slot,
-            msg.sender,
-            SLOT_PRICE,
-            time,
-            false,
-            false
-        );
+        bookings[bookingId] = Booking({
+            roomId: roomId,
+            roomName: roomName,
+            areaName: areaName,
+            position: position,
+            slot: slot,
+            user: msg.sender,
+            price: SLOT_PRICE,
+            time: time,
+            checkedIn: false,
+            cancelled: false
+        });
+
         roomSlotBooked[roomSlotId] = true;
 
-        emit BookingCreated(bookingId, roomId, slot, msg.sender, time);
+        emit BookingCreated(
+            bookingId,
+            roomId,
+            roomName,
+            areaId,
+            areaName,
+            position,
+            slot,
+            msg.sender,
+            time
+        );
     }
 
     function cancelBooking(bytes32 bookingId) external nonReentrant {
@@ -155,12 +191,13 @@ contract LabBookingSystem is Ownable, ReentrancyGuard {
         uint256 timeToBooking = booking.time - block.timestamp;
 
         if (timeToBooking >= 1 hours) {
-            refundAmount = booking.price; // 100% refund
+            refundAmount = booking.price;
         } else if (timeToBooking >= 30 minutes) {
-            refundAmount = booking.price / 2; // 50% refund
+            refundAmount = booking.price / 2;
         }
 
         booking.cancelled = true;
+
         bytes32 roomSlotId = generateRoomSlotId(
             booking.roomId,
             booking.slot,
@@ -175,7 +212,6 @@ contract LabBookingSystem is Ownable, ReentrancyGuard {
             );
         }
 
-        // Update consecutive cancellations
         User storage user = users[msg.sender];
         user.consecutiveCancellations++;
 
@@ -184,7 +220,15 @@ contract LabBookingSystem is Ownable, ReentrancyGuard {
             emit UserBlocked(msg.sender);
         }
 
-        emit BookingCancelled(bookingId, refundAmount);
+        emit BookingCancelled(
+            bookingId,
+            booking.roomId,
+            booking.roomName,
+            booking.areaId,
+            booking.areaName,
+            booking.position,
+            refundAmount
+        );
     }
 
     function checkIn(bytes32 bookingId) external onlyRegistered {
@@ -198,7 +242,7 @@ contract LabBookingSystem is Ownable, ReentrancyGuard {
         );
 
         booking.checkedIn = true;
-        users[msg.sender].consecutiveCancellations = 0; // Reset consecutive cancellations
+        users[msg.sender].consecutiveCancellations = 0;
 
         emit BookingCheckedIn(bookingId);
     }
